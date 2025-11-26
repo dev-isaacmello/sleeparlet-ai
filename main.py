@@ -39,31 +39,46 @@ class App:
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
         self.cap.set(cv2.CAP_PROP_FPS, 30)
+        # Otimizações de performance
+        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduzir buffer para menor latência
         
         if not self.cap.isOpened():
             raise RuntimeError("Não foi possível acessar a webcam.")
+        
+        # Cache para evitar processamento redundante
+        self.last_deep_learning_check = 0
+        self.deep_learning_check_interval = 0.5  # Verificar deep learning a cada 0.5s
+        self.cached_landmarks = None
             
     def run(self):
         """Loop principal da aplicação."""
         print("SleepArlet Iniciado - Pressione 'q' para sair")
         
+        # Inicializar estado de cache
+        self.state['last_stats'] = {'left_status': 'N/A', 'right_status': 'N/A', 'avg_ear': 0.0, 'blink_rate': 0, 'total_blinks': 0}
+        
         while True:
             ret, frame = self.cap.read()
             if not ret: break
             
-            # 1. Processamento
+            # 1. Processamento (sempre processar para manter detecção precisa)
             left_ear, right_ear, landmarks = self.detector.process_frame(frame)
+            
+            # Cache landmarks para uso posterior
+            if landmarks is not None:
+                self.cached_landmarks = landmarks
             
             # 2. Lógica de Detecção
             stats = self.process_detection(frame, left_ear, right_ear, landmarks)
             
-            # 3. Renderização
+            # 3. Renderização (modificar frame in-place para melhor performance)
             # Círculos nos olhos
-            frame = self.detector.draw_debug_circles(frame, landmarks, left_ear, right_ear)
+            if landmarks is not None:
+                self.detector.draw_debug_circles(frame, landmarks, left_ear, right_ear)
             # UI Moderna
-            frame = self.ui.draw_modern_panel(frame, stats)
+            self.ui.draw_modern_panel(frame, stats)
             # Overlay de Alerta
-            frame = self.alerts.create_alert_overlay(frame)
+            self.alerts.create_alert_overlay(frame)
             
             # 4. Exibição
             cv2.imshow('SleepArlet v2.6', frame)
@@ -76,20 +91,31 @@ class App:
     def process_detection(self, frame, left_ear, right_ear, landmarks):
         """Processa estados lógicos baseados nos dados brutos."""
         if left_ear is None or right_ear is None:
-            return {'left_status': 'N/A', 'right_status': 'N/A', 'avg_ear': 0.0, 'blink_rate': 0, 'total_blinks': 0}
+            stats = {'left_status': 'N/A', 'right_status': 'N/A', 'avg_ear': 0.0, 'blink_rate': 0, 'total_blinks': 0}
+            self.state['last_stats'] = stats
+            return stats
 
-        # Verificar estado de cada olho
+        # Verificar estado de cada olho (usar deep learning apenas quando necessário)
+        current_time = time.time()
+        use_deep_learning = (current_time - self.last_deep_learning_check) >= self.deep_learning_check_interval
+        
+        # Detectar olhos fechados - sempre usar detecção por EAR, deep learning apenas para validação
         left_closed = self.detector.is_eye_closed(
             left_ear, self.detector.left_ear_baseline, 
             frame, landmarks, 
-            self.detector.LEFT_EYE_INDICES, self.detector.LEFT_EYE_CONTOUR
+            self.detector.LEFT_EYE_INDICES, self.detector.LEFT_EYE_CONTOUR,
+            force_deep_learning=use_deep_learning
         )
         
         right_closed = self.detector.is_eye_closed(
             right_ear, self.detector.right_ear_baseline,
             frame, landmarks,
-            self.detector.RIGHT_EYE_INDICES, self.detector.RIGHT_EYE_CONTOUR
+            self.detector.RIGHT_EYE_INDICES, self.detector.RIGHT_EYE_CONTOUR,
+            force_deep_learning=use_deep_learning
         )
+        
+        if use_deep_learning:
+            self.last_deep_learning_check = current_time
         
         eyes_closed = left_closed and right_closed
         
@@ -99,13 +125,15 @@ class App:
         # Atualizar Sonolência
         self._update_drowsiness(eyes_closed)
         
-        return {
+        stats = {
             'left_status': 'FECHADO' if left_closed else 'ABERTO',
             'right_status': 'FECHADO' if right_closed else 'ABERTO',
             'avg_ear': (left_ear + right_ear) / 2,
             'blink_rate': self._calculate_blink_rate(),
             'total_blinks': self.state['blink_count']
         }
+        self.state['last_stats'] = stats
+        return stats
 
     def _update_blinks(self, is_closed):
         """Lógica de contagem de piscadas."""
@@ -132,7 +160,7 @@ class App:
                 self.state['eyes_closed_start'] = time.time()
             
             duration = time.time() - self.state['eyes_closed_start']
-            if duration > 1.3: # Threshold de sonolência
+            if duration > 0.8: # Threshold de sonolência reduzido (antes 1.3s)
                 self.alerts.trigger_alert()
         else:
             self.state['eyes_closed_start'] = None

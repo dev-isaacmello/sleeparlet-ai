@@ -53,28 +53,27 @@ class AlertSystem:
             self.last_beep_time = current_time
 
     def create_alert_overlay(self, frame: np.ndarray) -> np.ndarray:
-        """Aplica overlay visual de alerta no frame."""
+        """Aplica overlay visual de alerta no frame (modifica in-place para melhor performance)."""
         if not self.alert_active:
             return frame
             
         # Atualizar lógica de tempo antes de desenhar
         self.update()
         
-        frame_copy = frame.copy()
         h, w = frame.shape[:2]
         
         # Configuração visual baseada no estado do flash
         border_color = (0, 0, 255) if self.flash_state else (0, 0, 100)
         border_thickness = 30 if self.flash_state else 15
         
-        # Borda pulsante
-        cv2.rectangle(frame_copy, (0, 0), (w, h), border_color, border_thickness)
+        # Borda pulsante (modificar frame diretamente)
+        cv2.rectangle(frame, (0, 0), (w, h), border_color, border_thickness)
         
         # Texto de alerta centralizado
-        self._draw_centered_text(frame_copy, "VOCE DORMIU!!!!", 2.0, (0, 0, 255), -50)
-        self._draw_centered_text(frame_copy, "ACORDE AGORA!!!", 1.2, (255, 255, 255), 50)
+        self._draw_centered_text(frame, "VOCE DORMIU!!!!", 2.0, (0, 0, 255), -50)
+        self._draw_centered_text(frame, "ACORDE AGORA!!!", 1.2, (255, 255, 255), 50)
         
-        return frame_copy
+        return frame
 
     def _draw_centered_text(self, img, text, scale, color, y_offset):
         """Helper para desenhar texto centralizado."""

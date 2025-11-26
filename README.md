@@ -1,60 +1,89 @@
-# Sistema de Detecção de Sonolência
+# SleepArlet - Sistema de Detecção de Sonolência 
 
-Sistema Python de alta precisão para detectar quando você está com os olhos fechados por mais de 1.3 segundos, emitindo alertas visuais para te acordar.
+Sistema de monitoramento em tempo real que detecta quando os olhos permanecem fechados por mais de 0.8 segundos, emitindo alertas visuais e sonoros para prevenir acidentes por sonolência.
 
-## Características
+**Autor:** Isaac Mello
 
-- **Detecção precisa de olhos** usando MediaPipe Face Mesh
-- **Cálculo de EAR (Eye Aspect Ratio)** para determinar estado dos olhos
-- **Monitoramento de tempo** com olhos fechados
-- **Sistema de alerta visual** com popup e flash vermelho
-- **Contador de piscadas** (blink rate) em tempo real
-- **Interface gráfica** com visualização da webcam e indicadores
+---
 
-## Requisitos
+## 📋 Visão Geral
 
-- Python 3.8, 3.9, 3.10 ou 3.11 (Python 3.12 pode funcionar, mas Python 3.13 ainda não é suportado pelo MediaPipe)
-- Webcam
-- Windows/Linux/MacOS
+O SleepArlet utiliza visão computacional e deep learning para monitorar o estado dos olhos através da webcam, calculando o Eye Aspect Ratio (EAR) e aplicando modelos de classificação para determinar com precisão quando os olhos estão fechados.
 
-**⚠️ IMPORTANTE:** Se você está usando Python 3.13, você precisará usar Python 3.11 ou anterior. O MediaPipe ainda não tem builds disponíveis para Python 3.13.
+### Tecnologias Utilizadas
 
-## Instalação
+- **MediaPipe Face Mesh**: Detecção facial e landmarks precisos
+- **OpenCV**: Processamento de imagem e captura de vídeo
+- **TensorFlow/Keras**: Modelos de deep learning para classificação avançada
+- **NumPy**: Cálculos numéricos otimizados
 
-1. Clone ou baixe este repositório
+---
 
-2. **Verifique sua versão do Python:**
+## 🚀 Requisitos
+
+### Sistema
+
+- **Python**: 3.8, 3.9, 3.10 ou 3.11
+- **Webcam**: Funcional e acessível
+- **Sistema Operacional**: Windows, Linux ou macOS
+
+> **⚠️ Nota:** Python 3.13 não é suportado pelo MediaPipe. Use Python 3.11 ou anterior.
+
+### Dependências
+
+- `opencv-python >= 4.8.0`
+- `mediapipe >= 0.10.0`
+- `numpy >= 1.24.0`
+- `tensorflow >= 2.13.0`
+
+---
+
+## 📦 Instalação
+
+### 1. Clone o repositório
+
+```bash
+git clone <repository-url>
+cd wakeupi-ai
+```
+
+### 2. Verifique a versão do Python
+
 ```bash
 python --version
 ```
-Se você estiver usando Python 3.13, você precisará instalar Python 3.11 ou anterior. Você pode baixar Python 3.11 em [python.org](https://www.python.org/downloads/).
 
-3. Crie um ambiente virtual (recomendado):
-```bash
+Se necessário, instale Python 3.11 ou anterior em [python.org](https://www.python.org/downloads/).
+
+### 3. Crie e ative o ambiente virtual
+
+**Windows (PowerShell):**
+```powershell
 python -m venv venv
+.\venv\Scripts\Activate.ps1
 ```
 
-4. Ative o ambiente virtual:
-   - **Windows PowerShell:**
-     ```powershell
-     .\venv\Scripts\Activate.ps1
-     ```
-   - **Windows CMD:**
-     ```cmd
-     venv\Scripts\activate.bat
-     ```
-   - **Linux/MacOS:**
-     ```bash
-     source venv/bin/activate
-     ```
+**Windows (CMD):**
+```cmd
+python -m venv venv
+venv\Scripts\activate.bat
+```
 
-5. Instale as dependências:
+**Linux/macOS:**
+```bash
+python -m venv venv
+source venv/bin/activate
+```
+
+### 4. Instale as dependências
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Uso
+---
+
+## ▶️ Uso
 
 Execute o script principal:
 
@@ -64,107 +93,168 @@ python main.py
 
 ### Controles
 
-- **'q'**: Sair do programa
-- O sistema inicia automaticamente a captura da webcam
+- **`q`**: Encerrar o programa
 
-### Funcionalidades
+### Interface
 
-- **Detecção em tempo real**: O sistema detecta seu rosto e monitora seus olhos continuamente
-- **Alerta visual**: Quando seus olhos ficam fechados por mais de 1.3 segundos, um alerta vermelho piscante aparece na tela
-- **Informações na tela**:
-  - Status dos olhos (ABERTOS/FECHADOS)
-  - EAR médio (Eye Aspect Ratio)
-  - Tempo com olhos fechados
-  - Taxa de piscadas por minuto
-  - Contador total de piscadas
-  - FPS do sistema
+O sistema exibe em tempo real:
 
-## Como Funciona
+- **Status dos olhos**: ABERTO/FECHADO para cada olho
+- **EAR médio**: Eye Aspect Ratio calculado
+- **Taxa de piscadas**: Piscadas por minuto
+- **Total de piscadas**: Contador acumulado
+- **Indicadores visuais**: Círculos coloridos nos olhos (verde=aberto, vermelho=fechado)
+
+### Alerta de Sonolência
+
+Quando os olhos permanecem fechados por **0.8 segundos**, o sistema dispara:
+
+- **Alerta visual**: Borda vermelha pulsante na tela
+- **Alerta sonoro**: Beep do sistema
+- **Mensagem**: "VOCE DORMIU!!!! ACORDE AGORA!!!"
+
+O alerta permanece ativo até que os olhos sejam abertos novamente.
+
+---
+
+## 🔧 Funcionamento Técnico
 
 ### Eye Aspect Ratio (EAR)
 
-O sistema usa o algoritmo EAR para determinar se os olhos estão abertos ou fechados:
+O sistema calcula o EAR usando 6 pontos específicos dos olhos detectados pelo MediaPipe:
 
 ```
 EAR = (|p2-p6| + |p3-p5|) / (2 * |p1-p4|)
 ```
 
-Onde p1-p6 são pontos específicos dos olhos detectados pelo MediaPipe Face Mesh.
+**Interpretação:**
+- **EAR > 0.25**: Olhos abertos
+- **EAR < 0.25**: Olhos fechados
+- **EAR < 0.15**: Definitivamente fechado (detecção imediata)
 
-- **EAR alto** (> 0.25): Olhos abertos
-- **EAR baixo** (< 0.25): Olhos fechados
+### Threshold Adaptativo
 
-### Detecção de Sonolência
+O sistema utiliza um threshold adaptativo baseado no baseline individual:
 
-1. O sistema monitora continuamente o estado dos olhos
-2. Quando os olhos fecham, um timer é iniciado
-3. Se os olhos permanecem fechados por mais de 1.3 segundos, o alerta é disparado
-4. O alerta visual (flash vermelho) continua até que os olhos sejam abertos novamente
+- Calcula o baseline dinâmico dos olhos abertos
+- Ajusta o threshold para 65% do baseline
+- Mantém limites entre 0.18 e 0.28 para evitar falsos positivos
 
-### Detecção de Piscadas
+### Deep Learning (Opcional)
 
-- O sistema detecta transições de olhos abertos para fechados
-- Calcula a taxa de piscadas por minuto baseado nas últimas piscadas
-- Mantém um histórico das últimas 60 piscadas
+Quando habilitado, o sistema utiliza modelos CNN para validação em casos ambíguos:
 
-## Ajustes
+- Modelo principal: Arquitetura ResNet-like
+- Modelo leve: MobileNet-like para ensemble
+- Ativado apenas quando EAR está próximo do threshold (zona de incerteza)
 
-Você pode ajustar os parâmetros no código:
+### Otimizações de Performance
 
-### `main.py`
+- Processamento em resolução reduzida (480px)
+- Deep learning apenas quando necessário (a cada 0.5s)
+- Modificação in-place de frames para reduzir cópias
+- MediaPipe com refinamento de landmarks para precisão
 
-- `drowsiness_threshold`: Tempo em segundos com olhos fechados para disparar alerta (padrão: 1.3)
+---
 
-### `eye_detector.py`
-
-- `EAR_THRESHOLD`: Threshold para determinar se olho está fechado (padrão: 0.25)
-
-### `alert_system.py`
-
-- `flash_interval`: Intervalo entre flashes do alerta em segundos (padrão: 0.3)
-
-## Estrutura do Projeto
+## 📁 Estrutura do Projeto
 
 ```
-sleeparlet/
-├── main.py              # Script principal
-├── eye_detector.py      # Classe de detecção de olhos
-├── alert_system.py      # Sistema de alertas visuais
-├── requirements.txt     # Dependências
-└── README.md           # Este arquivo
+wakeupi-ai/
+├── main.py                  # Script principal e orquestração
+├── eye_detector.py          # Detecção de olhos e cálculo EAR
+├── deep_eye_classifier.py   # Modelos de deep learning
+├── alert_system.py          # Sistema de alertas visuais/sonoros
+├── ui_modern.py             # Interface gráfica moderna
+├── requirements.txt         # Dependências do projeto
+└── README.md               # Documentação
 ```
 
-## Dependências
+---
 
-- `opencv-python`: Processamento de imagem e captura de vídeo
-- `mediapipe`: Detecção facial e landmarks
-- `numpy`: Cálculos numéricos
+## ⚙️ Configurações
 
-## Notas
+### Parâmetros Ajustáveis
 
-- Certifique-se de ter boa iluminação para melhor detecção
-- Mantenha o rosto visível para a câmera
-- O sistema funciona melhor com uma pessoa por vez na frente da câmera
-- Para melhor precisão, ajuste o threshold EAR se necessário
+#### `main.py`
 
-## Troubleshooting
+```python
+deep_learning_check_interval = 0.5  # Intervalo para validação DL (segundos)
+```
 
-**Problema**: Rosto não detectado
-- **Solução**: Melhore a iluminação e certifique-se de que seu rosto está visível
+#### `eye_detector.py`
 
-**Problema**: Falsos positivos (alerta quando olhos estão abertos)
-- **Solução**: Aumente o `EAR_THRESHOLD` em `eye_detector.py`
+```python
+EAR_THRESHOLD = 0.25              # Threshold base para detecção
+EAR_SMOOTHING_FRAMES = 5          # Frames para suavização
+```
 
-**Problema**: Não detecta olhos fechados
-- **Solução**: Diminua o `EAR_THRESHOLD` em `eye_detector.py`
+#### `alert_system.py`
 
-**Problema**: Webcam não abre
-- **Solução**: Verifique se a webcam não está sendo usada por outro programa
+```python
+flash_interval = 0.2               # Intervalo entre flashes (segundos)
+beep_interval = 0.5               # Intervalo entre beeps (segundos)
+```
 
-**Problema**: Erro "No matching distribution found for mediapipe"
-- **Solução**: Você provavelmente está usando Python 3.13. Instale Python 3.11 ou anterior. O MediaPipe ainda não suporta Python 3.13.
+#### Tempo de Alerta
 
-## Licença
+O tempo para disparar o alerta está definido em `main.py`:
 
-Este projeto é fornecido como está, para uso pessoal e educacional.
+```python
+if duration > 0.8:  # Threshold de sonolência (segundos)
+    self.alerts.trigger_alert()
+```
 
+---
+
+## 🐛 Solução de Problemas
+
+### Rosto não detectado
+
+- **Causa**: Iluminação insuficiente ou rosto fora do campo de visão
+- **Solução**: Melhore a iluminação e posicione-se centralmente na frente da câmera
+
+### Falsos positivos (alerta com olhos abertos)
+
+- **Causa**: Threshold muito baixo ou baseline incorreto
+- **Solução**: Aumente `EAR_THRESHOLD` em `eye_detector.py` (ex: 0.27 ou 0.28)
+
+### Não detecta olhos fechados
+
+- **Causa**: Threshold muito alto
+- **Solução**: Diminua `EAR_THRESHOLD` em `eye_detector.py` (ex: 0.22 ou 0.23)
+
+### Webcam não abre
+
+- **Causa**: Webcam em uso por outro programa ou permissões
+- **Solução**: Feche outros programas que usam a webcam e verifique permissões do sistema
+
+### Erro ao instalar MediaPipe
+
+- **Causa**: Versão do Python incompatível (Python 3.13)
+- **Solução**: Instale Python 3.11 ou anterior
+
+### FPS muito baixo
+
+- **Causa**: Processamento pesado ou hardware limitado
+- **Solução**: O sistema já está otimizado. Se necessário, desabilite deep learning em `main.py`:
+  ```python
+  self.detector = EyeDetector(use_deep_learning=False)
+  ```
+
+---
+
+## 📝 Notas de Uso
+
+- **Iluminação**: Mantenha boa iluminação frontal para melhor detecção
+- **Posicionamento**: Mantenha o rosto visível e centralizado na câmera
+- **Ambiente**: Funciona melhor com uma pessoa por vez na frente da câmera
+- **Ajuste fino**: Ajuste o `EAR_THRESHOLD` conforme necessário para seu ambiente
+
+---
+
+## 📄 Licença
+
+Este projeto é de uso pessoal e educacional.
+
+**Desenvolvido por Isaac Mello - AI Engineer**

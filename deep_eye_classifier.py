@@ -183,7 +183,7 @@ class DeepEyeClassifier:
     def extract_eye_region(self, frame: np.ndarray, landmarks: np.ndarray, 
                           eye_indices: list) -> Optional[np.ndarray]:
         """
-        Extrai região do olho do frame.
+        Extrai região do olho do frame (otimizado para performance).
         
         Args:
             frame: Frame BGR
@@ -202,8 +202,8 @@ class DeepEyeClassifier:
             y_min = int(np.min(eye_points[:, 1]))
             y_max = int(np.max(eye_points[:, 1]))
             
-            # Adicionar padding maior para capturar mais contexto
-            padding = 20
+            # Padding reduzido para melhor performance
+            padding = 15
             x_min = max(0, x_min - padding)
             y_min = max(0, y_min - padding)
             x_max = min(frame.shape[1], x_max + padding)
@@ -218,24 +218,11 @@ class DeepEyeClassifier:
             # Converter para escala de cinza
             eye_gray = cv2.cvtColor(eye_region, cv2.COLOR_BGR2GRAY)
             
-            # Aplicar equalização de histograma para melhor contraste
-            eye_gray = cv2.equalizeHist(eye_gray)
+            # Redimensionar com interpolação mais rápida (LINEAR ao invés de CUBIC)
+            eye_resized = cv2.resize(eye_gray, self.input_size, interpolation=cv2.INTER_LINEAR)
             
-            # Redimensionar com interpolação de alta qualidade
-            eye_resized = cv2.resize(eye_gray, self.input_size, interpolation=cv2.INTER_CUBIC)
-            
-            # Aplicar filtro gaussiano suave para reduzir ruído
-            eye_resized = cv2.GaussianBlur(eye_resized, (3, 3), 0)
-            
-            # Normalizar com normalização mais robusta
+            # Normalizar (simplificado - remover operações custosas)
             eye_normalized = eye_resized.astype(np.float32) / 255.0
-            
-            # Aplicar normalização local (melhora contraste)
-            mean = np.mean(eye_normalized)
-            std = np.std(eye_normalized)
-            if std > 0:
-                eye_normalized = (eye_normalized - mean) / std
-                eye_normalized = (eye_normalized + 1) / 2  # Voltar para [0, 1]
             
             return eye_normalized
         except:
@@ -243,7 +230,7 @@ class DeepEyeClassifier:
     
     def classify_with_cnn(self, eye_image: np.ndarray) -> Tuple[bool, float]:
         """
-        Classifica olho usando CNN com ensemble para máxima precisão.
+        Classifica olho usando CNN (otimizado para performance - sem ensemble em tempo real).
         
         Args:
             eye_image: Imagem do olho normalizada
@@ -258,37 +245,11 @@ class DeepEyeClassifier:
             # Preparar entrada
             eye_input = eye_image.reshape(1, *self.input_size, 1)
             
-            predictions = []
-            confidences = []
+            # Usar apenas modelo principal para melhor performance (sem ensemble)
+            pred_main = self.model.predict(eye_input, verbose=0, batch_size=1)[0][0]
             
-            # Predição do modelo principal
-            pred_main = self.model.predict(eye_input, verbose=0)[0][0]
-            predictions.append(pred_main)
-            confidences.append(abs(pred_main - 0.5) * 2)
-            
-            # Predições dos modelos do ensemble
-            for model in self.model_ensemble:
-                try:
-                    pred = model.predict(eye_input, verbose=0)[0][0]
-                    predictions.append(pred)
-                    confidences.append(abs(pred - 0.5) * 2)
-                except:
-                    continue
-            
-            # Ensemble: média ponderada (modelo principal tem peso maior)
-            if len(predictions) > 1:
-                weights = [0.6] + [0.4 / (len(predictions) - 1)] * (len(predictions) - 1)
-                final_prediction = np.average(predictions, weights=weights)
-            else:
-                final_prediction = predictions[0]
-            
-            is_open = final_prediction > 0.5
-            confidence = abs(final_prediction - 0.5) * 2
-            
-            # Aumentar confiança se modelos concordam
-            if len(predictions) > 1:
-                agreement = 1.0 - np.std(predictions)
-                confidence = min(1.0, confidence * (1.0 + agreement * 0.3))
+            is_open = pred_main > 0.5
+            confidence = abs(pred_main - 0.5) * 2
             
             return is_open, confidence
         except Exception as e:

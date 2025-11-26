@@ -20,17 +20,17 @@ class ModernUI:
         
     def draw_modern_panel(self, frame: np.ndarray, stats: dict) -> np.ndarray:
         """
-        Desenha um painel lateral moderno e compacto.
+        Desenha um painel lateral moderno e compacto (modifica frame in-place).
         """
         h, w = frame.shape[:2]
         panel_w = 200  # Mais estreito
         
-        # Criar overlay para o painel
-        overlay = frame.copy()
+        # Criar overlay para o painel (usar view ao invés de cópia completa)
+        overlay = frame[:, :panel_w].copy()
         cv2.rectangle(overlay, (0, 0), (panel_w, h), UIColors.BG_DARK, -1)
         
-        # Adicionar blur/transparência
-        frame = cv2.addWeighted(overlay, self.panel_alpha, frame, 1 - self.panel_alpha, 0)
+        # Adicionar blur/transparência apenas na região do painel
+        frame[:, :panel_w] = cv2.addWeighted(overlay, self.panel_alpha, frame[:, :panel_w], 1 - self.panel_alpha, 0)
         
         # Configurações de layout
         margin_left = 20

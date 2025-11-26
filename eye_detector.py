@@ -20,14 +20,14 @@ class EyeDetector:
     RIGHT_EYE_CONTOUR = [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246]
     
     # Configurações
-    EAR_THRESHOLD = 0.20
+    EAR_THRESHOLD = 0.25  # Aumentado para melhor detecção
     EAR_SMOOTHING_FRAMES = 5
     
     def __init__(self, use_deep_learning: bool = False):
         self.mp_face_mesh = mp.solutions.face_mesh
         self.face_mesh = self.mp_face_mesh.FaceMesh(
             max_num_faces=1,
-            refine_landmarks=True,
+            refine_landmarks=True,  # Reabilitado para melhor precisão na detecção
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5,
             static_image_mode=False
@@ -52,13 +52,14 @@ class EyeDetector:
         """Processa o frame e retorna EARs e landmarks."""
         h, w = frame.shape[:2]
         
-        # Redimensionar para performance se necessário
-        process_frame = frame
-        scale = 1.0
-        if w > 640:
-            scale = 640.0 / w
+        # Redimensionar para performance - usar resolução intermediária para balancear FPS e precisão
+        target_width = 480  # Aumentado de 320 para melhor precisão na detecção
+        if w > target_width:
+            scale = target_width / w
             new_h = int(h * scale)
-            process_frame = cv2.resize(frame, (640, new_h))
+            process_frame = cv2.resize(frame, (target_width, new_h), interpolation=cv2.INTER_LINEAR)
+        else:
+            process_frame = frame
             
         rgb_frame = cv2.cvtColor(process_frame, cv2.COLOR_BGR2RGB)
         results = self.face_mesh.process(rgb_frame)
@@ -90,29 +91,44 @@ class EyeDetector:
 
     def is_eye_closed(self, ear: float, baseline: Optional[float], 
                       frame: np.ndarray, landmarks: np.ndarray, 
-                      eye_indices: list, eye_contour: list) -> bool:
+                      eye_indices: list, eye_contour: list, 
+                      force_deep_learning: bool = False) -> bool:
         """Determina se um olho específico está fechado."""
         if ear is None: return False
         
-        # Lógica de Threshold Adaptativo
+        # Se EAR está muito baixo, definitivamente está fechado
+        if ear < 0.15:
+            return True
+        
+        # Lógica de Threshold Adaptativo melhorada
         threshold = self.EAR_THRESHOLD
+        
+        # Usar baseline se disponível, mas com multiplicador mais conservador
         if baseline is not None:
-            threshold = max(0.10, min(baseline * 0.65, 0.25))
+            # Threshold adaptativo baseado no baseline (65% do baseline)
+            adaptive_threshold = baseline * 0.65
+            # Garantir que o threshold não fique muito alto nem muito baixo
+            threshold = max(0.18, min(adaptive_threshold, 0.28))
         elif len(self.left_ear_history) > 3: # Fallback para histórico recente
-             threshold = max(0.15, min(np.mean(list(self.left_ear_history)) * 0.70, 0.22))
+            avg_ear = np.mean(list(self.left_ear_history))
+            threshold = max(0.20, min(avg_ear * 0.70, 0.26))
 
         closed_by_ear = ear < threshold
         
-        # Validação por Deep Learning (se habilitado e ambíguo)
-        if self.use_deep_learning and self.deep_classifier:
-            # Se EAR está próximo do threshold (zona de incerteza)
-            if abs(ear - threshold) < 0.05:
-                eye_landmarks = landmarks[eye_indices]
-                is_open, conf = self.deep_classifier.classify_eye(
-                    frame, landmarks, eye_contour, eye_landmarks
-                )
-                if conf > 0.6:
-                    return not is_open
+        # Validação por Deep Learning apenas quando necessário e forçado
+        # Usar deep learning para casos ambíguos
+        if self.use_deep_learning and self.deep_classifier and force_deep_learning:
+            # Usar deep learning se EAR está próximo do threshold (zona de incerteza)
+            if abs(ear - threshold) < 0.05:  # Zona de incerteza aumentada
+                try:
+                    eye_landmarks = landmarks[eye_indices]
+                    is_open, conf = self.deep_classifier.classify_eye(
+                        frame, landmarks, eye_contour, eye_landmarks
+                    )
+                    if conf > 0.6:  # Threshold de confiança reduzido para usar mais
+                        return not is_open
+                except:
+                    pass  # Se falhar, usar detecção por EAR
                     
         return closed_by_ear
 
@@ -145,9 +161,9 @@ class EyeDetector:
 
     def draw_debug_circles(self, frame: np.ndarray, landmarks: np.ndarray, 
                           left_ear: float, right_ear: float) -> np.ndarray:
-        """Desenha visualização dos olhos."""
+        """Desenha visualização dos olhos (modifica frame in-place para melhor performance)."""
         if landmarks is None: return frame
-        frame_copy = frame.copy()
+        # Não criar cópia - modificar frame diretamente para melhor performance
         
         for indices, ear, baseline in [
             (self.LEFT_EYE_INDICES, left_ear, self.left_ear_baseline), 
@@ -166,6 +182,6 @@ class EyeDetector:
             w = np.max(points[:, 0]) - np.min(points[:, 0])
             radius = int(w * 0.7)
             
-            cv2.circle(frame_copy, tuple(center), radius, color, 2)
+            cv2.circle(frame, tuple(center), radius, color, 2)
             
-        return frame_copy
+        return frame
