@@ -145,15 +145,15 @@ class EyeDetector:
 
     def _update_baselines(self, left: float, right: float):
         """Atualiza baselines dinamicamente usando os maiores valores (olhos abertos)."""
-        # Simplificado: usa percentil superior do histórico
-        pass # Lógica movida para processamento direto ou mantida simples
+        if self.left_ear_baseline is None:
+            self.left_ear_baseline = left
+        else:
+            self.left_ear_baseline = max(self.left_ear_baseline * 0.99, left)  # Decaimento lento
         
-        # Para manter consistência com a versão anterior que funcionava bem:
-        if self.left_ear_baseline is None: self.left_ear_baseline = left
-        else: self.left_ear_baseline = max(self.left_ear_baseline * 0.99, left) # Decaimento lento
-        
-        if self.right_ear_baseline is None: self.right_ear_baseline = right
-        else: self.right_ear_baseline = max(self.right_ear_baseline * 0.99, right)
+        if self.right_ear_baseline is None:
+            self.right_ear_baseline = right
+        else:
+            self.right_ear_baseline = max(self.right_ear_baseline * 0.99, right)
 
     def _smooth_ear(self, history: deque, value: float) -> float:
         history.append(value)

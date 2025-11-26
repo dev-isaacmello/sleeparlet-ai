@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-from typing import Tuple, Optional
 import time
 import threading
 import platform
@@ -14,7 +13,6 @@ class AlertSystem:
     
     def __init__(self):
         self.alert_active = False
-        self.alert_start_time = None
         self.flash_state = False
         self.last_flash_time = 0
         self.flash_interval = 0.2
@@ -25,14 +23,12 @@ class AlertSystem:
         """Ativa o estado de alerta."""
         if not self.alert_active:
             self.alert_active = True
-            self.alert_start_time = time.time()
             # Tocar beep inicial em thread separada
             threading.Thread(target=self._play_beep, daemon=True).start()
             
     def reset_alert(self):
         """Desativa o estado de alerta."""
         self.alert_active = False
-        self.alert_start_time = None
         self.flash_state = False
         
     def update(self):

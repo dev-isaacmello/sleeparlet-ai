@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple
 from dataclasses import dataclass
 
 @dataclass

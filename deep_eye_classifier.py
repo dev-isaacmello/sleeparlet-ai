@@ -31,14 +31,12 @@ class DeepEyeClassifier:
             use_pretrained: Se True, tenta carregar modelo pré-treinado ou criar um novo
         """
         self.model = None
-        self.model_ensemble = []  # Ensemble de modelos para maior precisão
         self.input_size = (64, 64)  # Tamanho aumentado para melhor precisão
         self.use_pretrained = use_pretrained
         
         # Histórico para análise temporal avançada
         self.prediction_history = deque(maxlen=15)
         self.confidence_history = deque(maxlen=15)
-        self.feature_history = deque(maxlen=10)  # Histórico de features
         
         if TF_AVAILABLE and use_pretrained:
             self._build_or_load_model()
@@ -105,50 +103,9 @@ class DeepEyeClassifier:
         
         return model
     
-    def _build_lightweight_model(self):
-        """Constrói modelo leve mas eficiente (MobileNet-like) para uso em tempo real."""
-        inputs = keras.Input(shape=(*self.input_size, 1))
-        
-        # Depthwise separable convolutions (mais eficiente)
-        x = layers.Conv2D(32, (3, 3), padding='same', activation='relu')(inputs)
-        x = layers.BatchNormalization()(x)
-        
-        # Blocos depthwise
-        def depthwise_block(x, filters):
-            x = layers.DepthwiseConv2D((3, 3), padding='same', activation='relu')(x)
-            x = layers.BatchNormalization()(x)
-            x = layers.Conv2D(filters, (1, 1), activation='relu')(x)
-            x = layers.BatchNormalization()(x)
-            return x
-        
-        x = depthwise_block(x, 64)
-        x = layers.MaxPooling2D(2, 2)(x)
-        x = layers.Dropout(0.2)(x)
-        
-        x = depthwise_block(x, 128)
-        x = layers.MaxPooling2D(2, 2)(x)
-        x = layers.Dropout(0.25)(x)
-        
-        x = depthwise_block(x, 256)
-        x = layers.GlobalAveragePooling2D()(x)
-        
-        x = layers.Dense(128, activation='relu')(x)
-        x = layers.Dropout(0.4)(x)
-        outputs = layers.Dense(1, activation='sigmoid')(x)
-        
-        model = keras.Model(inputs, outputs)
-        model.compile(
-            optimizer=keras.optimizers.Adam(learning_rate=0.001),
-            loss='binary_crossentropy',
-            metrics=['accuracy']
-        )
-        
-        return model
-    
     def _build_or_load_model(self):
-        """Constrói ou carrega modelos pré-treinados (ensemble)."""
+        """Constrói ou carrega modelo pré-treinado."""
         model_path = 'eye_classifier_model.h5'
-        lightweight_path = 'eye_classifier_lightweight.h5'
         
         # Tentar carregar modelo principal
         if os.path.exists(model_path):
@@ -163,22 +120,7 @@ class DeepEyeClassifier:
             print("Criando modelo CNN avançado com arquitetura ResNet-like...")
             self.model = self._build_model()
         
-        # Tentar carregar modelo leve para ensemble
-        if os.path.exists(lightweight_path):
-            try:
-                lightweight_model = keras.models.load_model(lightweight_path)
-                self.model_ensemble.append(lightweight_model)
-                print(f"✓ Modelo leve carregado para ensemble")
-            except:
-                pass
-        
-        # Se não há modelo leve, criar um
-        if len(self.model_ensemble) == 0:
-            print("Criando modelo leve para ensemble...")
-            lightweight_model = self._build_lightweight_model()
-            self.model_ensemble.append(lightweight_model)
-        
-        print(f"✓ Sistema de deep learning inicializado com {1 + len(self.model_ensemble)} modelo(s)")
+        print("✓ Sistema de deep learning inicializado")
     
     def extract_eye_region(self, frame: np.ndarray, landmarks: np.ndarray, 
                           eye_indices: list) -> Optional[np.ndarray]:
@@ -382,28 +324,4 @@ class DeepEyeClassifier:
             confidence = avg_confidence
         
         return is_open, confidence
-    
-    def are_both_eyes_open(self, left_open: bool, right_open: bool, 
-                          left_conf: float, right_conf: float) -> bool:
-        """
-        Determina se ambos os olhos estão abertos com base nas classificações.
-        
-        Args:
-            left_open: Olho esquerdo está aberto
-            right_open: Olho direito está aberto
-            left_conf: Confiança da classificação esquerda
-            right_conf: Confiança da classificação direita
-            
-        Returns:
-            True se ambos os olhos estão abertos
-        """
-        # Requer ambos os olhos abertos OU alta confiança em pelo menos um
-        if left_open and right_open:
-            return True
-        
-        # Se um está aberto com alta confiança, considerar ambos abertos
-        if (left_open and left_conf > 0.7) or (right_open and right_conf > 0.7):
-            return True
-        
-        return False
 

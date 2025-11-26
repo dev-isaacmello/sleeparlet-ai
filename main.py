@@ -2,7 +2,6 @@ import os
 import warnings
 import cv2
 import time
-import numpy as np
 from collections import deque
 from eye_detector import EyeDetector
 from alert_system import AlertSystem
@@ -24,8 +23,7 @@ class App:
             'blink_count': 0,
             'blink_times': deque(maxlen=60),
             'last_blink_time': time.time(),
-            'eyes_closed_start': None,
-            'is_drowsy': False
+            'eyes_closed_start': None
         }
         
     def setup_system(self):
@@ -48,7 +46,6 @@ class App:
         # Cache para evitar processamento redundante
         self.last_deep_learning_check = 0
         self.deep_learning_check_interval = 0.5  # Verificar deep learning a cada 0.5s
-        self.cached_landmarks = None
             
     def run(self):
         """Loop principal da aplicação."""
@@ -63,10 +60,6 @@ class App:
             
             # 1. Processamento (sempre processar para manter detecção precisa)
             left_ear, right_ear, landmarks = self.detector.process_frame(frame)
-            
-            # Cache landmarks para uso posterior
-            if landmarks is not None:
-                self.cached_landmarks = landmarks
             
             # 2. Lógica de Detecção
             stats = self.process_detection(frame, left_ear, right_ear, landmarks)
